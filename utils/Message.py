@@ -21,6 +21,20 @@ class Message:
             response[key] = value
         return response
 
+    def get_dmessage(self, message):
+        print(message['command'])
+        # if command == 'init':
+        if message['command'] in self.FORWM:
+            return 0, message
+        
+        if message['command'] == 'info_file' or message['command'] == 'read_dir' or message['command'] == 'init':
+            return 1, None
+        
+        if message['command'] == 'write_file' or message['command'] == 'read_file':
+            return 2, None
+
+        return -1, self.get_rmessage(verdict=0, message='Invalid command')
+
 
     def ping(self):
         return self.get_message(command='PING')
@@ -78,6 +92,19 @@ class Message:
     CLIENT_DELETE_DIR = '{"command": "delete_dir", "arguments": []}'
     CLIENT_READ_DIR = '{"command": "read_dir", "arguments": []}'
     CLIENT_MAKE_DIR = '{"command": "make_dir", "arguments": []}'
+
+
+    FORWM = [
+        'create_file',
+        'delete_file',
+        'copy_file',
+        'move_file',
+        'delete_dir',
+        'make_dir'
+    ]
+
+
+
 
     # CLIENT_RESPONSE_OK = json.loads('{"verdict": 1, "message": ""}')
     # CLIENT_RESPONSE_FAIL = json.loads

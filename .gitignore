@@ -105,3 +105,6 @@ venv.bak/
 
 # IDE
 .vscode
+
+# files for testing
+*.json
