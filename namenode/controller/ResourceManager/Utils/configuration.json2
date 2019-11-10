@@ -1,0 +1,1 @@
+{"namenode": {"client_port_number": 5555}, "datanodes": [{"name": "datanode-1", "ip": "127.0.0.1", "port": 2000}, {"name": "datanode-2", "ip": "127.0.0.1", "port": 2001}, {"name": "datanode-3", "ip": "127.0.0.1", "port": 2002}]}

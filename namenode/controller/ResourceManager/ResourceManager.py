@@ -1,21 +1,24 @@
 import zmq
 import json
 import threading
-from Utils.State import State
-from Utils.Handlers import HealthChecker, Handler
+from ResourceManager.Utils.State import State #pylint: disable=import-error
+from ResourceManager.Utils.Handlers import HealthChecker, Handler #pylint: disable=import-error
 import time
 import sys
 sys.path.append('/home/abdurasul/Repos/distributed-system-project/utils')
 from Message import Message #pylint: disable=import-error
+import multiprocessing
 
-class ResourceManager:
+class ResourceManager(multiprocessing.Process):
     def __init__(self):
+        multiprocessing.Process.__init__(self)
         self.socket_client = None
         self.context = None
         self.state = None
         self.msgs = Message()
 
     def start(self):
+        print('ResourceManager started')
         self.context = zmq.Context()
         self.socket_client = self.context.socket(zmq.ROUTER) #pylint: disable=no-member
         self.socket_client.bind("tcp://127.0.0.1:5555")
@@ -36,15 +39,23 @@ class ResourceManager:
 
         pinger = HealthChecker(self.context, self.state.get_datanodes(), self.msgs)
         pinger.start()
+        print('everything is started')
 
-        zmq.proxy(self.socket_client, self.handler) #pylint: disable=no-member
+        try:
+            zmq.proxy(self.socket_client, self.handler) #pylint: disable=no-member
+        except zmq.ContextTerminated:
+            print('context terminated')
 
 
-        for w in workers:
-            w.join()
-        pinger.join()
+        # for w in workers:
+        #     w.join()
+        # pinger.join()
+
+        print('stopp---------------------------------------------------------------------------------------ed')
+
+        self.state.save_configuration()
 
 
-if __name__ == "__main__":
-    msgh = ResourceManager()
-    msgh.start()
+# if __name__ == "__main__":
+#     msgh = ResourceManager()
+#     msgh.start()
