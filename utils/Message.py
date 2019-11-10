@@ -20,9 +20,7 @@ class Message:
         for key, value in other:
             response[key] = value
         return response
-    
-    
-    
+
     def get_dmessage(self, message):
         print(message['command'])
         # if command == 'init':
@@ -95,6 +93,7 @@ class Message:
     CLIENT_READ_DIR = '{"command": "read_dir", "arguments": []}'
     CLIENT_MAKE_DIR = '{"command": "make_dir", "arguments": []}'
 
+
     FORWM = [
         'create_file',
         'delete_file',
@@ -103,6 +102,7 @@ class Message:
         'delete_dir',
         'make_dir'
     ]
+
 
 
 
