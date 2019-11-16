@@ -3,8 +3,8 @@ import zmq
 import time
 import sys
 import json
-sys.path.append('/home/abdurasul/Repos/distributed-system-project/utils')
-from Message import Message, Messenger #pylint: disable=import-error
+# sys.path.append('/home/hamy/PycharmProjects/distributed-system-project/utils')
+from utils.Message import Message, Messenger #pylint: disable=import-error
 
 class HealthChecker(threading.Thread):
     def __init__(self, context, datanodes, msgs):
