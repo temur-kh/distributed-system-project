@@ -1,12 +1,13 @@
 import zmq
 import json
 import threading
-from ResourceManager.Utils.State import State #pylint: disable=import-error
-from ResourceManager.Utils.Handlers import HealthChecker, Handler #pylint: disable=import-error
+from .Utils.State import State #pylint: disable=import-error
+from .Utils.Handlers import HealthChecker, Handler #pylint: disable=import-error
 import time
 import sys
-sys.path.append('/home/abdurasul/Repos/distributed-system-project/utils')
-from Message import Message #pylint: disable=import-error
+import os
+# sys.path.append(os.path.join(os.path.curdir, './distributed-system-project/utils'))
+from utils.Message import Message #pylint: disable=import-error
 import multiprocessing
 
 class ResourceManager(multiprocessing.Process):

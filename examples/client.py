@@ -16,8 +16,8 @@ class Message:
     
     def send_init(self):
         message = '''{
-            "command": "init",
-            "arguments": []
+            "command": "info_file",
+            "arguments": ["/abdurasul"]
         }'''
         self.send_message(message)
 
