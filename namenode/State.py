@@ -1,8 +1,6 @@
 import json
 import os
-import zmq
 import copy
-
 
 class Namenode:
     def __init__(self, client_port_number):
@@ -19,7 +17,6 @@ class Datanode:
         self.ip = ip_address
         self.status = False
         self.cid = None
-        self.socket = None
 
     def getName(self):
         return self.name
@@ -38,23 +35,16 @@ class Datanode:
 
     def getCid(self):
         return self.cid
+    
+    def getAddress(self):
+        return f'http://{self.ip}:{self.port}'
 
     def setCid(self, cid):
         self.cid = cid
 
-    def setSocket(self, socket):
-        self.socket = socket
-        self.socket.connect(f'tcp://{self.ip}:{self.port}')
-
-    def getSocket(self):
-        return self.socket
-
     def getInfo(self):
         return self.name, self.port, self.ip
-
-    def close(self):
-        self.socket.close()
-
+    
 
 class Datanodes:
     def __init__(self):
@@ -62,7 +52,7 @@ class Datanodes:
 
     def addNewNode(self, name, ip_address, port_number):
         self.datanodes.append(Datanode(name, ip_address, port_number))
-
+    
     def getDatanodes(self):
         return self.datanodes
 
@@ -76,7 +66,7 @@ class Datanodes:
             if dnode.getStatus():
                 res.append(dnode)
         return res
-
+    
     def getDatanodeInfo(self):
         info = []
         for dnode in self.datanodes:
@@ -85,17 +75,16 @@ class Datanodes:
         return info
 
 
+
 class State:
-    def __init__(self, context, configuration_path='configuration.json'):
+    def __init__(self, configuration_path='configuration.json'):
         self.configuration_path = configuration_path
         self.configuration = self.load_configuration()
         if self.configuration is None:
             raise Exception("Error occurred while initializing node")
         self.parse_configuration()
-        self.context = context
-        self.initialize_communications()
         self.tree = Tree()
-
+    
     def load_configuration(self):
         configuration = None
         with open(self.configuration_path) as json_conf:
@@ -103,9 +92,9 @@ class State:
             configuration = json.load(json_conf)
             # except:
             #     print('Error loading configuration')
-
+        
         return configuration
-
+    
     def save_configuration(self):
         conf = {}
         conf['namenode'] = {}
@@ -116,33 +105,33 @@ class State:
         # conf_json = json.dumps(conf)
         with open(self.configuration_path, 'w') as conf_file:
             json.dump(conf, conf_file)
-
+        
         self.tree.save_configuration()
-
+        
     def parse_configuration(self):
         self.namenode = Namenode(self.configuration['namenode']['client_port_number'])
         self.datanodes = Datanodes()
         dnodes = self.configuration['datanodes']
         for dnode in dnodes:
             self.datanodes.addNewNode(dnode['name'], dnode['ip'], dnode['port'])
-
+    
     def get_datanodes(self):
         return self.datanodes.getDatanodes()
-
-    def initialize_communications(self):
-        for dnode in self.datanodes.getDatanodes():
-            dnode.setSocket(self.context.socket(zmq.DEALER))  # pylint: disable=no-member
-
+    
+    # def initialize_communications(self):
+    #     for dnode in self.datanodes.getDatanodes():
+    #         dnode.setSocket(self.context.socket(zmq.DEALER)) #pylint: disable=no-member
+    
     def get_available_node(self):
         for dnode in self.get_datanodes():
-            if (dnode.getStatus()):
+            if(dnode.getStatus()):
                 return dnode
-
+        return None
 
 class Dir:
-    def __init__(self):
+    def  __init__(self):
         self.subdir = []
-
+    
     def setValues(self, name, isFile=0, subdir=[]):
         self.name = name
         self.isFile = isFile
@@ -157,7 +146,7 @@ class Dir:
 
     def setName(self, name):
         self.name = name
-
+    
     def getType(self):
         return self.isFile
 
@@ -173,19 +162,20 @@ class Dir:
                 self.subdir.pop(i)
                 # print('removed-----------')
                 break
-
+    
     def popSubDir(self, name):
         for i in range(len(self.subdir)):
             if self.subdir[i].getName() == name:
                 self.subdir.pop(i)
                 break
-
+    
+    
     def hasSubDir(self, name):
         for d in self.subdir:
             if d.getName() == name:
                 return True
         return False
-
+    
     def getSubDir(self, name):
         for d in self.subdir:
             if d.getName() == name:
@@ -216,7 +206,7 @@ class Tree:
             # try:
             conf = json.load(json_conf)
         self.conf = conf
-
+    
     def parse_conf(self, conf):
         root = Dir()
         root.setValues(name=conf['name'], isFile=conf['isFile'])
@@ -231,7 +221,7 @@ class Tree:
         print(next_dir)
         for sub in next_dir.subdir:
             self.iterate(sub)
-
+    
     def save_conf(self):
         conf = {}
         conf['root'] = self.root
@@ -265,7 +255,7 @@ class Tree:
         if check_dir:
             return True if curdir.getType() == 0 else False
         return True
-
+    
     def get_current_configuration(self, curdir):
         subdir = []
         print(curdir)
@@ -274,7 +264,7 @@ class Tree:
             subdir.append(conf_dir)
         conf = {"name": curdir.getName(), "isFile": curdir.getType(), "subdir": subdir}
         return conf
-
+    
     def save_configuration(self):
         conf = self.get_current_configuration(self.root)
         with open(self.configuration_path, 'w') as conf_file:
@@ -316,7 +306,7 @@ class Tree:
     def move(self, path1, path2='.'):
         if not self.is_valid_path(path1):
             return 1, 'Invalid source path'
-
+        
         if not self.is_valid_path(path2):
             return 1, 'Invalid target path'
 
@@ -328,13 +318,13 @@ class Tree:
         if target.getType() == 1:
             return 1, 'Target is not a directory'
         target.addSubDir(directory)
-        return 0, 'Successfully moved'
+        return 2, 'Successfully moved'
         # directory = self.get_dir(path1)
-
+    
     def copy_file(self, path1, path2='.'):
         if not self.is_valid_path(path1):
             return 1, 'Invalid source path'
-
+        
         if not self.is_valid_path(path2):
             return 1, 'Invalid target path'
 
@@ -345,36 +335,36 @@ class Tree:
         target = self.get_dir(path2)
         if target.getType() == 1:
             return 1, 'Target is not a directory'
-
+        
         if directory.getType() == 0:
             return 1, 'Source is not a file'
-
+        
         copy_dir = Dir()
         copy_dir.setValues(directory.getName(), isFile=directory.getType())
         target.addSubDir(copy_dir)
-        return 0, 'Successfully moved'
-
+        return 2, 'Successfully moved'
+    
     def delete_dir(self, path):
         if not self.is_valid_path(path):
             return 1, 'Invalid path'
-
+        
         parent = self.get_dir(path, parent=True)
         directory = self.getDirName(path)
         parent.removeSubDir(directory)
-        return 0, 'Successfully removed'
-
+        return 2, 'Successfully removed'
+    
     def delete_file(self, path):
         if not self.is_valid_path(path):
             return 1, 'Invalid path'
-
+        
         file = self.get_dir(path)
         if file.getType() == 0:
             return 1, 'Is a directory'
         parent = self.get_dir(path, parent=True)
         directory = self.getDirName(path)
         parent.removeSubDir(directory)
-        return 0, 'Successfully removed'
-
+        return 2, 'Successfully removed'
+    
     def make_dir(self, path):
         parent = self.get_dir(path, parent=True)
         if parent is None:
@@ -386,8 +376,8 @@ class Tree:
         new_dir = Dir()
         new_dir.setValues(name=name, isFile=0)
         parent.addSubDir(new_dir)
-        return 0, 'Success'
-
+        return 2, 'Success'
+    
     def create_file(self, path):
         parent = self.get_dir(path, parent=True)
         if parent is None:
@@ -396,30 +386,31 @@ class Tree:
         name = self.getDirName(path)
         if parent.hasSubDir(name):
             return 1, 'Already exists'
-
+        
         new_file = Dir()
         new_file.setValues(name=name, isFile=1)
         parent.addSubDir(new_file)
-        return 0, 'Success'
+        return 2, 'Success'
 
     def info_file(self, path):
         if not self.is_valid_path(path):
             return 1, 'Invalid path'
         file = self.get_dir(path)
+        print(f'Path: {path} file name: {file.getName()}, file type: {file.getType()}')
         if file.getType() == 0:
             return 1, 'Is a directory'
-
+        
         info = {}
         info['name'] = file.getName()
         message = json.dumps(info)
         return 0, message
-
+    
     def can_write(self, path):
         parent = self.get_dir(path)
         if parent is None:
             return 1, 'Invalid path'
         return 0, 'Success'
-
+    
     def can_read(self, path):
         if not self.is_valid_path(path):
             return 1, 'Invalid path'
@@ -428,15 +419,15 @@ class Tree:
             return 1, 'Is a directory'
         else:
             return 0, 'Success'
-
+    
     def info_dir(self, path):
         if not self.is_valid_path(path):
             return 1, 'Invalid path'
-
+        
         directory = self.get_dir(path)
         if directory.getType() == 1:
             return 1, 'Is a file'
-
+        
         info = {}
         info['name'] = directory.getName()
         info['subdir'] = []
@@ -444,10 +435,34 @@ class Tree:
             info['subdir'].append({"name": sub.getName(), "isFile": sub.getType()})
         info_string = json.dumps(info)
         return 0, info_string
+    
+    def write_file(self, path):
+        if path is None:
+            return 1, 'Path is not specified'
 
+        parent = self.get_dir(path, parent=True)
+        if parent is None:
+            return 1, 'Invalid path'
+
+        name = self.getDirName(path)
+        if parent.hasSubDir(name):
+            return 1, 'Already exists'
+        
+        new_file = Dir()
+        new_file.setValues(name=name, isFile=1)
+        parent.addSubDir(new_file)
+        return 2, 'Success'
+
+    def read_file(self, path):
+        file = self.get_dir(path)
+        if file.getType() != 1:
+            return 1, 'Is a directory'
+        
+        return 2, 'Success'
+    
     def init(self):
         return 0, 'Success'
-
+    
     def perform(self, message):
         command = message['command']
         args = message['arguments']
@@ -459,6 +474,8 @@ class Tree:
             return self.delete_file(args[0])
         if command == 'copy_file':
             return self.copy_file(args[0], args[1])
+        if command == 'move_file':
+            return self.move(args[0], args[1])
         if command == 'delete_dir':
             return self.delete_dir(args[0])
         if command == 'info_file':
@@ -467,22 +484,8 @@ class Tree:
             return self.info_dir(args[0])
         if command == 'init':
             return self.init()
-
-    # def read_dir(self, path):
-    #     if not self.is_valid_path(path):
-    #         return 1, 'Invalid path'
-
-    #     directory = self.get_dir(path)
-
-# # Checking...
-# if __name__ == "__main__":
-#     # curD = os.path.curdir
-#     # print(os.listdir(curD))
-#     state = State(zmq.Context())
-#     state.tree.iterate(state.tree.root)
-#     verdict, message = state.tree.read_file('/abdurasul')
-#     print(f'verdict: {verdict}, message: {message}')
-#     state.tree.iterate(state.tree.root)
-#     state.save_configuration()
-#     # state.save_configuration()
-#     # state.tree.save_configuration()
+        if command == 'write_file':
+            return self.write_file(args[0])
+        if command == 'read_file':
+            return self.read_file(args[0])
+        

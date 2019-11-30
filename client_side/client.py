@@ -1,6 +1,7 @@
 from multiprocessing import Process
 import zmq
 import json
+import requests
 
 HEADER = '\033[95m'
 OKBLUE = '\033[94m'
@@ -40,27 +41,6 @@ commands = {
 }
 
 
-class Message:
-    def __init__(self, socket):
-        self.socket = socket
-
-    def send_message(self, message):
-        self.socket.send_json(message)
-
-    def recv_message(self):
-        return json.loads(self.socket.recv().decode('utf-8'))
-
-    def send_init(self):
-        message = '''{
-            "command": "info_file",
-            "arguments": [" "]
-        }'''
-        self.send_message(message)
-
-    def recv_init_res(self):
-        return self.recv_message()
-
-
 def verify_path(path):
     slash = '/'
     to_verify = path
@@ -94,27 +74,29 @@ def connector():
     global curr_path
     global status_line
     print("Type in IP address: ")
-    ip = "tcp://127.0.0.1:5555"
+    ip = "http://127.0.0.1:5000"
 
-    context = zmq.Context()
     # Initialising sockets to initiate connection
     print("Connecting to the name-node..")
 
-    socket = context.socket(zmq.DEALER)
-    socket.connect(ip)
-
-    init_connection = Message(socket)
-    init_connection.send_init()
+    #Initializing...
+    try:
+        response = requests.post(ip, json=json.loads('{"command": "init", "arguments": []}'))
+    except (requests.ConnectionError):
+        print('Cannot connect to namenode')
+        return
+    except (requests.ReadTimeout):
+        print('Connection timed out')
+        return
 
     # Validating connection based on verdict of the namenode
-    validate = init_connection.recv_init_res()
-    print(validate)
 
-    if validate['verdict'] == 1:
+    validate = response.json()
+    if validate['verdict'] == 0:
         print(OKBLUE + "Connection established. Type in commands" + ENDC)
 
         # Getting commands while connection is active
-        while validate['verdict'] == 1:
+        while validate['verdict'] == 0:
 
             line = str(input(status_line)).split(' ')
 
@@ -130,6 +112,13 @@ def connector():
 
                 arguments = msg_list[1:]
 
+                if cmd == 'ls':
+                    if len(arguments) == 0 :
+                        arguments = curr_path
+                
+                if cmd == 'cd':
+                    pass
+
                 # TODO Switch cases for commands
                 # if cmd == 'cd':
                 #     curr_path.append(arguments[0])
@@ -138,14 +127,20 @@ def connector():
                 to_send = json.loads(json_request)
                 to_send['command'] = commands['commands'][cmd]
                 to_send['arguments'] = arguments
-                to_send = json.dumps(to_send)
 
                 print(to_send)
 
-                request = Message(socket)
-                request.send_message(to_send)
+                try:
+                    response = requests.post(ip, json=to_send)
+                except (requests.ReadTimeout):
+                    print(FAIL + "Connection timed out" + ENDC)
+                    continue
+                except (requests.ConnectionError):
+                    print(FAIL + "Remote namenode connection failed" + ENDC)
+                    return
 
-                response = request.recv_message()
+                # response = request.recv_message()
+                response = response.json()
                 print(response['verdict'])
                 print(response)
 
@@ -154,6 +149,7 @@ def connector():
 
                 else:
                     if cmd == 'ls':
+
                         print(response['message'])
                     if cmd == 'touch':
                         print("File has been created")
