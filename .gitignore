@@ -102,9 +102,3 @@ venv.bak/
 
 # mypy
 .mypy_cache/
-
-# IDE
-.vscode
-
-# files for testing
-*.json
