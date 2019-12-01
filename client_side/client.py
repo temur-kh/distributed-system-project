@@ -1,6 +1,10 @@
 from multiprocessing import Process
 import zmq
 import json
+import requests
+import os
+
+nip = "http://127.0.0.1:5000"
 
 HEADER = '\033[95m'
 OKBLUE = '\033[94m'
@@ -12,10 +16,12 @@ BOLD = '\033[1m'
 UNDERLINE = '\033[4m'
 
 global_path = '~/'
+root = '/'
+curr_path = '/'
 
-curr_path = ['~']
-
-status_line = OKGREEN + "namenode:" + ENDC + ":" + OKBLUE + '/'.join(curr_path) + ENDC + " $ "
+def get_status_line():
+    status_line = OKGREEN + "namenode:" + ENDC + ":" + OKBLUE + curr_path + ENDC + " $ "
+    return status_line
 
 # Making request JSON for the namenode
 json_request = '''{
@@ -24,7 +30,7 @@ json_request = '''{
                 }
                 '''
 commands = {
-    "commands": {
+    
         "touch": "create_file",
         "rm": "delete_file",
         "info": "info_file",
@@ -36,29 +42,7 @@ commands = {
         "ls": "read_dir",
         "cd": "read_dir",
         "mkdir": "make_dir"
-    }
 }
-
-
-class Message:
-    def __init__(self, socket):
-        self.socket = socket
-
-    def send_message(self, message):
-        self.socket.send_json(message)
-
-    def recv_message(self):
-        return json.loads(self.socket.recv().decode('utf-8'))
-
-    def send_init(self):
-        message = '''{
-            "command": "info_file",
-            "arguments": [" "]
-        }'''
-        self.send_message(message)
-
-    def recv_init_res(self):
-        return self.recv_message()
 
 
 def verify_path(path):
@@ -89,36 +73,83 @@ def cd(curr, target):
     if target in curr_path:
         pass
 
+def change_directory(path=''):
+    global curr_path
+    if len(path) < 1:
+        curr_path = root
+        return 0
+    
+    if path[0] != '/':
+        path = os.path.join(curr_path, path)
+    
+    ver, response = send_message(command='read_dir', arguments=[path])
+    if ver != 0:
+        print(FAIL + response + ENDC)
+        return 1
+
+    response = response.json()
+    if response['verdict'] == 1:
+        print(FAIL + response['message'] + ENDC)
+        return 1
+    
+    curr_path = os.path.normpath(path)
+    # print(f'current path = {curr_path}')
+    return 0
+    
+def send_message(ip=nip, command='init', arguments=[]):
+    to_send = json.loads(json_request)
+    to_send['command'] = command
+    to_send['arguments'] = arguments
+    # print(f'Sending: {to_send}')
+
+    try:
+        response = requests.post(ip, json=to_send)
+    except (requests.ReadTimeout):
+        print(FAIL + "Connection timed out" + ENDC)
+        return 1, ''
+    except (requests.ConnectionError):
+        print(FAIL + "Remote namenode connection failed" + ENDC)
+        return 2, ''
+    return 0, response
+
+def get_abspath(path):
+    return os.path.join(curr_path, path)
+
+def get_arguments(arguments):
+    args = []
+    for p in arguments:
+        if len(p) == 0:
+            continue
+        if p[0] == '/':
+            args.append(p)
+        else:
+            args.append(get_abspath(p))
+    return args    
 
 def connector():
     global curr_path
-    global status_line
-    print("Type in IP address: ")
-    ip = "tcp://127.0.0.1:5555"
+    # print("Type in IP address: ")
+    
 
-    context = zmq.Context()
     # Initialising sockets to initiate connection
     print("Connecting to the name-node..")
 
-    socket = context.socket(zmq.DEALER)
-    socket.connect(ip)
+    #Initializing...
+    ver, response = send_message()
+    if ver != 0:
+        print(FAIL + "Connection Failed" + ENDC)
+        return
 
-    init_connection = Message(socket)
-    init_connection.send_init()
-
-    # Validating connection based on verdict of the namenode
-    validate = init_connection.recv_init_res()
-    print(validate)
-
-    if validate['verdict'] == 1:
+    validate = response.json()
+    if validate['verdict'] == 0:
         print(OKBLUE + "Connection established. Type in commands" + ENDC)
 
         # Getting commands while connection is active
-        while validate['verdict'] == 1:
+        while validate['verdict'] == 0:
 
-            line = str(input(status_line)).split(' ')
+            line = str(input(get_status_line())).split(' ')
 
-            if line[0] not in commands['commands']:
+            if line[0] not in commands:
                 if line[0] == 'exit()':
                     pass
                 else:
@@ -130,54 +161,68 @@ def connector():
 
                 arguments = msg_list[1:]
 
-                # TODO Switch cases for commands
-                # if cmd == 'cd':
-                #     curr_path.append(arguments[0])
-                #     print('/'.join(curr_path))
+                if cmd == 'cd':
+                    if len(arguments) > 0:
+                        path = arguments[0]
+                    else:
+                        path = ''
+                    ret = change_directory(path)
+                    if ret == 2:
+                        return
+                    continue
 
-                to_send = json.loads(json_request)
-                to_send['command'] = commands['commands'][cmd]
-                to_send['arguments'] = arguments
-                to_send = json.dumps(to_send)
+                if cmd == 'ls':
+                    if len(arguments) == 0 :
+                        arguments = [curr_path]
 
-                print(to_send)
+                arguments = get_arguments(arguments)
+                ver, response = send_message(command=commands[cmd], arguments=arguments)
 
-                request = Message(socket)
-                request.send_message(to_send)
-
-                response = request.recv_message()
-                print(response['verdict'])
-                print(response)
+                if ver == 1:
+                    continue
+                if ver == 2:
+                    return
+                
+                response = response.json()
+                # print(response['verdict'])
+                # print(response)
 
                 if response['verdict'] == 1:
                     print(FAIL + response['message'] + ENDC)
 
                 else:
                     if cmd == 'ls':
-                        print(response['message'])
-                    if cmd == 'touch':
-                        print("File has been created")
-                    if cmd == 'rm':
-                        print("File has been deleted")
-                    if cmd == 'info':
-                        print(response['message'])
-                    if cmd == 'cp':
-                        print(response['message'])
-                    if cmd == 'mv':
-                        print(response['message'])
-                    if cmd == 'r--':
-                        print(response['message'])
-                    if cmd == 'rw-':
-                        print(response['message'])
-                    if cmd == 'rm-r':
-                        print(response['message'])
-                    if cmd == 'mkdir':
-                        print(response['message'])
+                        directory = json.loads(response['message'])
+                        for dirs in directory['subdir']:
+                            if dirs['isFile']:
+                                print(OKGREEN + dirs['name'] + ENDC)
+                            else:
+                                print(OKBLUE + dirs['name'] + ENDC)
 
-                    print('>> ' + response['message'])
+                    elif cmd == 'touch':
+                        print("File has been created")
+                    elif cmd == 'rm':
+                        print("File has been deleted")
+                    else:
+                        #  cmd == 'info':
+                        print(response['message'])
+                    # if cmd == 'cp':
+                    #     print(response['message'])
+                    # if cmd == 'mv':
+                    #     print(response['message'])
+                    # if cmd == 'r--':
+                    #     print(response['message'])
+                    # if cmd == 'rw-':
+                    #     print(response['message'])
+                    # if cmd == 'rm-r':
+                    #     print(response['message'])
+                    # if cmd == 'mkdir':
+                    #     print(response['message'])
+
+                    # print('>> ' + response['message'])
 
             if line[0] == 'exit()':
-                print(OKGREEN + "Connection had been closed")
+                print(OKGREEN + "Connection has been closed")
                 validate['verdict'] = 0
                 exit()
     else:
