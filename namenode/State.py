@@ -307,42 +307,67 @@ class Tree:
         if not self.is_valid_path(path1):
             return 1, 'Invalid source path'
         
-        if not self.is_valid_path(path2):
+        parent = self.get_dir(path2, parent=True)
+        if parent is None:
             return 1, 'Invalid target path'
-
+    
         parentDir = self.get_dir(path1, parent=True)
         directory = self.get_dir(path1)
+
+        if directory.getType() == 0:
+            return 1, 'Source is a directory'
+
         dir_name = self.getDirName(path1)
         parentDir.popSubDir(dir_name)
-        target = self.get_dir(path2)
-        if target.getType() == 1:
-            return 1, 'Target is not a directory'
-        target.addSubDir(directory)
-        return 2, 'Successfully moved'
-        # directory = self.get_dir(path1)
+
+        name = self.getDirName(path2)
+        subdir = parent.getSubDir(name)
+        if subdir is None:
+            directory.setName(name)
+            parent.addSubDir(directory)
+        else:
+            if subdir.getType() == 1:
+                return 1, 'Already exists'
+            else:
+                if subdir.hasSubDir(dir_name):
+                    return 1, 'Already exists'
+                else:
+                    subdir.addSubDir(directory)
+        
+        return 2, 'Successfully removed'
     
     def copy_file(self, path1, path2='.'):
         if not self.is_valid_path(path1):
             return 1, 'Invalid source path'
         
-        if not self.is_valid_path(path2):
+        parent = self.get_dir(path2, parent=True)
+        if parent is None:
             return 1, 'Invalid target path'
 
         directory = self.get_dir(path1)
         if directory.getType() == 0:
             return 1, 'Source is a directory'
 
-        target = self.get_dir(path2)
-        if target.getType() == 1:
-            return 1, 'Target is not a directory'
-        
-        if directory.getType() == 0:
-            return 1, 'Source is not a file'
+        name = self.getDirName(path2)
+        dir_name = directory.getName()
         
         copy_dir = Dir()
         copy_dir.setValues(directory.getName(), isFile=directory.getType())
-        target.addSubDir(copy_dir)
-        return 2, 'Successfully moved'
+
+        subdir = parent.getSubDir(name)
+        if subdir is None:
+            copy_dir.setName(name)
+            parent.addSubDir(copy_dir)
+        else:
+            if subdir.getType() == 1:
+                return 1, 'Already exists'
+            else:
+                if subdir.hasSubDir(dir_name):
+                    return 1, 'Already exists'
+                else:
+                    subdir.addSubDir(copy_dir)
+                    
+        return 2, 'Successfully copied'
     
     def delete_dir(self, path):
         if not self.is_valid_path(path):
@@ -428,6 +453,8 @@ class Tree:
         if directory.getType() == 1:
             return 1, 'Is a file'
         
+        print("-------------------------------------")
+        print(directory.getName())
         info = {}
         info['name'] = directory.getName()
         info['subdir'] = []
@@ -451,14 +478,14 @@ class Tree:
         new_file = Dir()
         new_file.setValues(name=name, isFile=1)
         parent.addSubDir(new_file)
-        return 2, 'Success'
+        return 3, 'Success'
 
     def read_file(self, path):
         file = self.get_dir(path)
         if file.getType() != 1:
             return 1, 'Is a directory'
         
-        return 2, 'Success'
+        return 3, 'Success'
     
     def init(self):
         return 0, 'Success'

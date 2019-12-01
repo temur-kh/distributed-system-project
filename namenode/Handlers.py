@@ -1,9 +1,10 @@
 import threading
+import os
 import zmq
 import time
 import sys
 import json
-sys.path.append('/home/abdurasul/Repos/distributed-system-project/utils')
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../utils'))
 from Message import Message, Messenger #pylint: disable=import-error
 import requests
 from flask import Flask, request, jsonify
