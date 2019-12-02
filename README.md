@@ -14,14 +14,8 @@ Academic Project Fall 2019 (Distributive Systems Course)
 
 ### Requirements 
 
-```
-python3
-docker
-docker-swarm
-flask
-zmq
-docker-compose
-```
+Install requirements 
+`pip install -requirements.txt`
 
 
 ### Running it
