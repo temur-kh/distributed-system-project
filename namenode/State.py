@@ -51,6 +51,10 @@ class Datanodes:
         self.datanodes = []
 
     def addNewNode(self, name, ip_address, port_number, status=-1):
+        for dnode in self.datanodes:
+            if dnode.getIp() == ip_address and dnode.getPort() == port_number:
+                dnode.setStatus(-1)
+                return
         self.datanodes.append(Datanode(name, ip_address, port_number, status))
     
     def getDatanodes(self):
@@ -84,6 +88,11 @@ class State:
             raise Exception("Error occurred while initializing node")
         self.parse_configuration()
         self.tree = Tree()
+        self.max_size = 100000
+        self.size = 0
+    
+    def isNew(self):
+        return self.size == 0
     
     def load_configuration(self):
         configuration = None
@@ -132,7 +141,7 @@ class State:
         return None
     
     def setNewSize(self, newSize):
-        self.size = min(self.size, newSize)
+        self.max_size = min(self.max_size, newSize)
     
     def addNewDatanode(self, name=None, ip='127.0.0.1', port=2000):
         if name is None:
@@ -207,44 +216,22 @@ class Dir:
 
 
 class Tree:
-    def __init__(self, configuration_path='directory_tree.json'):
+    def __init__(self):
         self.root = None
-        # self.configuration_path = configuration_path
-        # self.conf = None
-        # self.load_conf()
-        # self.root = self.parse_conf(self.conf)
-        # self.iterate(self.root)
-        # print(self.is_valid_path('/etc/../etc/../'))
 
-    def load_conf(self):
-        conf = None
-        root = Dir()
-        root.setName('root')
-        with open(self.configuration_path) as json_conf:
-            # try:
-            conf = json.load(json_conf)
-        self.conf = conf
-    
-    def parse_conf(self, conf):
-        root = Dir()
-        root.setValues(name=conf['name'], isFile=conf['isFile'])
-        # print(root)
-        for sub in conf['subdir']:
-            root.addSubDir(self.parse_conf(sub))
-            # print(root.subdir[-1])
-        # print(root)
-        return root
+    # def load_conf(self):
+    #     conf = None
+    #     root = Dir()
+    #     root.setName('root')
+    #     with open(self.configuration_path) as json_conf:
+    #         # try:
+    #         conf = json.load(json_conf)
+    #     self.conf = conf
 
     def iterate(self, next_dir):
         print(next_dir)
         for sub in next_dir.subdir:
             self.iterate(sub)
-    
-    def save_conf(self):
-        conf = {}
-        conf['root'] = self.root
-        with open(self.configuration_path, 'w') as conf_file:
-            json.dump(conf, conf_file)
 
     def is_valid_path(self, path):
         p = path.split('/')
@@ -283,10 +270,10 @@ class Tree:
         conf = {"name": curdir.getName(), "isFile": curdir.getType(), "subdir": subdir}
         return conf
     
-    def save_configuration(self):
-        conf = self.get_current_configuration(self.root)
-        with open(self.configuration_path, 'w') as conf_file:
-            json.dump(conf, conf_file)
+    # def save_configuration(self):
+    #     conf = self.get_current_configuration(self.root)
+    #     with open(self.configuration_path, 'w') as conf_file:
+    #         json.dump(conf, conf_file)
 
     def get_dir(self, path, parent=False):
         p = path.split('/')
@@ -325,9 +312,10 @@ class Tree:
         if not self.is_valid_path(path1):
             return 1, 'Invalid source path'
         
-        parent = self.get_dir(path2, parent=True)
-        if parent is None:
-            return 1, 'Invalid target path'
+        if path2 != '/':
+            parent = self.get_dir(path2, parent=True)
+            if parent is None:
+                return 1, 'Invalid target path'
     
         parentDir = self.get_dir(path1, parent=True)
         directory = self.get_dir(path1)
@@ -336,11 +324,19 @@ class Tree:
             return 1, 'Source is a directory'
 
         dir_name = self.getDirName(path1)
-        parentDir.popSubDir(dir_name)
+
+        if path2 == '/':
+            if self.root.hasSubDir(dir_name):
+                return 1, 'Target already exists'
+            else:
+                parentDir.popSubDir(dir_name)
+                self.root.addSubDir(directory)
+                return 2, 'Successfully moved'
 
         name = self.getDirName(path2)
         subdir = parent.getSubDir(name)
         if subdir is None:
+            parentDir.popSubDir(dir_name)
             directory.setName(name)
             parent.addSubDir(directory)
         else:
@@ -350,27 +346,38 @@ class Tree:
                 if subdir.hasSubDir(dir_name):
                     return 1, 'Already exists'
                 else:
+                    parentDir.popSubDir(dir_name)
                     subdir.addSubDir(directory)
         
-        return 2, 'Successfully removed'
+        return 2, 'Successfully moved'
     
     def copy_file(self, path1, path2='.'):
         if not self.is_valid_path(path1):
             return 1, 'Invalid source path'
         
-        parent = self.get_dir(path2, parent=True)
-        if parent is None:
-            return 1, 'Invalid target path'
+        
+        if path2 != '/':
+            parent = self.get_dir(path2, parent=True)
+            if parent is None:
+                return 1, 'Invalid target path'
 
         directory = self.get_dir(path1)
         if directory.getType() == 0:
             return 1, 'Source is a directory'
-
-        name = self.getDirName(path2)
-        dir_name = directory.getName()
         
+        name = self.getDirName(path2)
+
+        dir_name = directory.getName()
+
         copy_dir = Dir()
         copy_dir.setValues(directory.getName(), isFile=directory.getType())
+        
+        if path2 == '/':
+            if self.root.hasSubDir(dir_name):
+                return 1, 'Target already exists'
+            else:
+                self.root.addSubDir(copy_dir)
+                return 2, 'Successfully copied'
 
         subdir = parent.getSubDir(name)
         if subdir is None:
@@ -495,7 +502,7 @@ class Tree:
             return 1, 'Already exists'
         
         new_file = Dir()
-        new_file.setValues(name=name, isFile=1)
+        new_file.setValues(name=name, isFile=1, size=size)
         parent.addSubDir(new_file)
         return 3, 'Success'
 

@@ -4,10 +4,10 @@ from threading import Thread
 import json
 import sys
 from pprint import pprint
-from datanode.handlers import *
+from handlers import *
 import os
 import requests
-
+import ast
 
 PING_RESPONSE = {"id": 1}
 DATANODE_ADDRESSES = set()
@@ -17,38 +17,43 @@ app = Flask(__name__)
 
 
 class DataNodePropagate(Thread):
+    # a new thread to propagate updates to other nodes
     def __init__(self, url, data):
         Thread.__init__(self)
         self.url = url
         self.data = data
 
     def run(self):
+        # make three tries
         tries = 0
         while tries < 3:
-            resp = requests.get(self.url, json=self.data)
-            if resp.json()['verdict'] == 0:
-                break
+            try:
+                resp = requests.get(self.url, json=self.data)
+                if resp.json()['verdict'] == 0:
+                    break
+            except:
+                pass
             tries += 1
 
 
 def request_datanodes_info():
-    res = requests.get(NAMENODE, json={'command': 'dn_list'})
+    res = requests.get(NAMENODE, json={'command': 'dn_list', 'size': 1000})
     add_nodes(res.json())
 
-
 def propagate(request):
+    data = request.get_json()
+    if 'no-prop' in data:
+        return
+            
+    # propagate updates to other nodes
     for node in DATANODE_ADDRESSES:
-        print(node)
-        url = os.path.join(node, '/')
-        print(url)
-        data = request.get_json()
-        data['arguments'] = []
+        url = node
+        data['no-prop'] = 'yes'
         conn = DataNodePropagate(url, data)
         conn.start()
 
-
 def add_nodes(json_data):
-    if 'arguments' not in json_data:
+    if 'arguments' in json_data:
         for addr in json_data['arguments']:
             DATANODE_ADDRESSES.add(addr)
         return {'verdict': 0, 'message': 'New datanodes were memorized.'}
@@ -57,40 +62,30 @@ def add_nodes(json_data):
 
 
 def remove_nodes(json_data):
-    if 'arguments' not in json_data:
+    if 'arguments' in json_data:
         for addr in json_data['arguments']:
             DATANODE_ADDRESSES.remove(addr)
         return {'verdict': 0, 'message': 'Old datanodes were forgotten.'}
     else:
         return {'verdict': 1, 'message': 'No arguments are provided.'}
 
+@app.route('/', methods=['GET', 'POST'])
+def get_request():
+    # handle comming requests
 
-@app.route('/', methods=['POST'])
-def post_request():
     json_data = request.get_json()
-    pprint(json_data)
+    print(json_data)
     try:
         cmd = json_data['command']
     except KeyError:
         return json.dumps({'verdict': 1, 'message': 'The request does not contain command field.'})
 
+    print('json_data-----------', json_data)
     if cmd == 'write_file':
         result = write_file(app, request)
         propagate(request)
-    else:
-        result = {'verdict': 1, 'message': 'The command is invalid.'}
 
-    return json.dumps(result)
-
-@app.route('/', methods=['GET'])
-def get_request():
-    json_data = request.get_json()
-    try:
-        cmd = json_data['command']
-    except KeyError:
-        return json.dumps({'verdict': 1, 'message': 'The request does not contain command field.'})
-
-    if cmd == 'init':
+    elif cmd == 'init':
         result = init(app, request)
         propagate(request)
     elif cmd == 'create_file':
@@ -137,5 +132,5 @@ if __name__ == "__main__":
     else:
         raise ValueError('The arguments provided are incorrect.')
     app.config['root'] = root
-    # request_datanodes_info()
-    app.run(debug=True, host='0.0.0.0')
+    request_datanodes_info()
+    app.run(debug=True, port=8000)

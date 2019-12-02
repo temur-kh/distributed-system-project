@@ -1,25 +1,22 @@
 import os
 import shutil
 import requests
-
+import time
 
 def write_file(app, request):
-    # check file is passed
-    if 'file' not in request.files:
-        return {'verdict': 1, 'message': 'No file to write.'}
-    file = request.files['file']
-
     # check the filepath or filename is passed
     json_data = request.get_json()
     if 'arguments' not in json_data:
         return {'verdict': 1, 'message': 'No arguments for the command.'}
-    elif len(json_data['arguments']) != 1:
+    elif len(json_data['arguments']) != 2:
         return {'verdict': 1, 'message': 'Wrong number of arguments is passed.'}
     file_path = json_data['arguments'][0][1:]
+    file_obj = json_data['arguments'][1]
 
     try:
         path = os.path.join(app.config['root'], file_path)
-        file.save(path)
+        with open(path, 'w') as file:
+            file.write(file_obj)
         return {'verdict': 0, 'message': 'File was written.'}
     except:
         return {'verdict': 1, 'message': 'Wrong path for file write is given.'}
@@ -28,7 +25,12 @@ def write_file(app, request):
 def init(app, request):
     root = app.config['root']
     try:
-        shutil.rmtree(root)
+        for name in os.listdir(root):
+            path = os.path.join(root, name)
+            if os.path.isfile(path):
+                os.remove(path)
+            else:
+                shutil.rmtree(path)
         return {'verdict': 0, 'message': 'The file system was initialized.'}
     except:
         return {'verdict': 1, 'message': 'The file system was not initialized.'}
@@ -166,19 +168,21 @@ def make_dir(app, request):
         return {'verdict': 1, 'message': 'Wrong path for directory read is given.'}
 
 
-def recursive_repl(dir, url):
-    requests.get(url, json={'command': 'make_dir', 'arguments': [dir]})
-    for name in os.listdir(dir):
-        path = os.path.join(dir, name)
+def recursive_repl(directory, url, root):
+    # make recursive replication of all files to another node
+    for name in os.listdir(directory):
+        print(name)
+        path = os.path.join(directory, name)
+        send_path = os.path.join(root, name)
         if os.path.isfile(path):
-            requests.post(url,
-                          json={'command': 'write_file', 'arguments': [path]},
-                          files={path: open(path, 'rb')})
+            requests.post(url, json={'command': 'write_file', 'arguments': [send_path, open(path, 'r').read()]})
         else:
-            recursive_repl(path, url)
+            requests.get(url, json={'command': 'make_dir', 'arguments': [send_path]})
+            recursive_repl(path, url, send_path)
 
 
 def replicate(app, request):
+    # run a replication activity
     json_data = request.get_json()
     if 'arguments' not in json_data:
         return {'verdict': 1, 'message': 'No arguments for the command.'}
@@ -186,5 +190,5 @@ def replicate(app, request):
         return {'verdict': 1, 'message': 'Wrong number of arguments is passed.'}
     url = json_data['arguments'][0]
     root = app.config['root']
-    recursive_repl(dir, url)
+    recursive_repl(root, url, "/")
     return {'verdict': 0, 'message': 'Replication completed.'}
