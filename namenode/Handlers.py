@@ -18,6 +18,10 @@ class HealthChecker(threading.Thread):
     
     def run(self):
         while True:
+            nodes = []
+            for dnode in self.state.get_datanodes():
+                nodes.append([dnode.getAddress(), dnode.getStatus()])
+            print(nodes)
             repl_node = None
             delete_nodes = []
             for dnode in self.state.get_datanodes():
@@ -41,29 +45,36 @@ class HealthChecker(threading.Thread):
                     except(requests.ReadTimeout, requests.ConnectionError):
                         continue
             
-            if repl_node is None:
-                continue
-        
+            print('size ------------------', self.state.size)
+            if (not self.state.isNew()) and (repl_node is None):
+                print('The system is in inconsistent state...')
+                exit(1)
+            
             new_nodes = []
 
             for dnode in self.state.get_datanodes():
                 if dnode.getStatus() == -1:
-                    
-                    try:
-                        response = requests.post(dnode.getAddress(), json=self.msgs.get_message(command='repl', arguments=[repl_node.getAddress()]), timeout=1)
-                    except(requests.ReadTimeout, requests.ConnectionError):
-                        continue
-                    
+                    # node = repl_node if repl_node is not None else dnode
+                    if repl_node is not None:
+                        try:
+                            response = requests.post(repl_node.getAddress(), json=self.msgs.get_message(command='repl', arguments=[dnode.getAddress()]), timeout=1)
+                        except(requests.ReadTimeout, requests.ConnectionError):
+                            continue
+
                     new_nodes.append(dnode.getAddress())
                     dnode.setStatus(1)
             
             # Updating datanode information in datanodes
             if len(new_nodes) > 0:
                 for dnode in self.state.get_datanodes():
+                    address = dnode.getAddress()
+                    if address in new_nodes:
+                        continue
                     try:
                         response = requests.post(dnode.getAddress(), json=self.msgs.get_message(command='NEW_NODE', arguments=new_nodes), timeout=1)
                     except(requests.ReadTimeout, requests.ConnectionError):
                         continue
 
+            time.sleep(10)
 
-            time.sleep(3)
+            

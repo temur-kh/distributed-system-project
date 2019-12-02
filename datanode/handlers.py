@@ -1,7 +1,7 @@
 import os
 import shutil
 import requests
-
+import time
 
 def write_file(app, request):
     # check the filepath or filename is passed
@@ -15,7 +15,7 @@ def write_file(app, request):
 
     try:
         path = os.path.join(app.config['root'], file_path)
-        with open(path, 'wb') as file:
+        with open(path, 'w') as file:
             file.write(file_obj)
         return {'verdict': 0, 'message': 'File was written.'}
     except:
@@ -23,7 +23,6 @@ def write_file(app, request):
 
 
 def init(app, request):
-    # init root directory and format
     root = app.config['root']
     try:
         for name in os.listdir(root):
@@ -38,7 +37,6 @@ def init(app, request):
 
 
 def create_file(app, request):
-    # create a file
     json_data = request.get_json()
     if 'arguments' not in json_data:
         return {'verdict': 1, 'message': 'No arguments for the command.'}
@@ -54,7 +52,6 @@ def create_file(app, request):
 
 
 def delete_file_or_dir(app, request):
-    # delete file or directory by path
     json_data = request.get_json()
     if 'arguments' not in json_data:
         return {'verdict': 1, 'message': 'No arguments for the command.'}
@@ -77,7 +74,6 @@ def delete_file_or_dir(app, request):
 
 
 def copy_file(app, request):
-    # copy one file to another path
     json_data = request.get_json()
     if 'arguments' not in json_data:
         return {'verdict': 1, 'message': 'No arguments for the command.'}
@@ -96,7 +92,6 @@ def copy_file(app, request):
 
 
 def move_file(app, request):
-    # move one file to another path
     json_data = request.get_json()
     if 'arguments' not in json_data:
         return {'verdict': 1, 'message': 'No arguments for the command.'}
@@ -115,7 +110,6 @@ def move_file(app, request):
 
 
 def read_file(app, request):
-    # read a file content
     json_data = request.get_json()
     if 'arguments' not in json_data:
         return {'verdict': 1, 'message': 'No arguments for the command.'}
@@ -137,7 +131,6 @@ def read_file(app, request):
 
 
 def read_dir(app, request):
-    # read what files exist in a directory
     json_data = request.get_json()
     if 'arguments' not in json_data:
         return {'verdict': 1, 'message': 'No arguments for the command.'}
@@ -157,7 +150,6 @@ def read_dir(app, request):
 
 
 def make_dir(app, request):
-    # create a directory
     json_data = request.get_json()
     if 'arguments' not in json_data:
         return {'verdict': 1, 'message': 'No arguments for the command.'}
@@ -176,17 +168,17 @@ def make_dir(app, request):
         return {'verdict': 1, 'message': 'Wrong path for directory read is given.'}
 
 
-def recursive_repl(directory, url):
+def recursive_repl(directory, url, root):
     # make recursive replication of all files to another node
     for name in os.listdir(directory):
+        print(name)
         path = os.path.join(directory, name)
+        send_path = os.path.join(root, name)
         if os.path.isfile(path):
-            requests.post(url,
-                          json={'command': 'write_file', 'arguments': [path]},
-                          files={path: open(path, 'rb')})
+            requests.post(url, json={'command': 'write_file', 'arguments': [send_path, open(path, 'r').read()]})
         else:
-            requests.get(url, json={'command': 'make_dir', 'arguments': [path]})
-            recursive_repl(path, url)
+            requests.get(url, json={'command': 'make_dir', 'arguments': [send_path]})
+            recursive_repl(path, url, send_path)
 
 
 def replicate(app, request):
@@ -198,5 +190,5 @@ def replicate(app, request):
         return {'verdict': 1, 'message': 'Wrong number of arguments is passed.'}
     url = json_data['arguments'][0]
     root = app.config['root']
-    recursive_repl(root, url)
+    recursive_repl(root, url, "/")
     return {'verdict': 0, 'message': 'Replication completed.'}

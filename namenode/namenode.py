@@ -12,6 +12,8 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../uti
 app = Flask(__name__)
 msgs = None
 state = None
+DATANODE_PORT = 8000
+num = 0
 
 def send_message(ip, command='init', arguments=[]):
     to_send = json.loads('{}')
@@ -28,14 +30,13 @@ def send_message(ip, command='init', arguments=[]):
 
 @app.route('/', methods=['GET', 'POST'])
 def process():
+    global num
     print('something')
     omessage = request.get_json(force=True)
     print(omessage)
     if omessage is None:
         return msgs.get_rmessage(verdict=1, message='Wrong command format. Use JSON format')
     
-    # command = message['command']
-    # arguments = message['arguments']
     print(omessage)
     print(omessage['command'])
     # message_json = json.loads(message)
@@ -47,7 +48,13 @@ def process():
         response['arguments'] = state.get_available_datanodes()
         state.setNewSize(size)
         datanode_ip = request.environ['REMOTE_ADDR']
-        datanode_port = request.environ['REMOTE_PORT']
+        num += 1
+        if num > 2:
+            datanode_port = 8001
+        else:
+            datanode_port = DATANODE_PORT
+
+        print(f'new datanode. ip: {datanode_ip}, port: {datanode_port}')
         state.addNewDatanode(ip=datanode_ip, port=datanode_port)
         return response
 

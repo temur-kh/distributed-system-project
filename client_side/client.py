@@ -1,6 +1,7 @@
 import json
 import requests
 import os
+import sys
 
 nip = "http://127.0.0.1:5000"
 
@@ -34,12 +35,13 @@ commands = {
         "info": "info_file",
         "cp": "copy_file",
         "mv": "move_file",
-        "r--": "read_file",
-        "rw-": "write_file",
+        "cpr": "read_file",
+        "cpl": "write_file",
         "rm-r": "delete_dir",
         "ls": "read_dir",
         "cd": "read_dir",
-        "mkdir": "make_dir"
+        "mkdir": "make_dir",
+        "local" : "local"
 }
 
 
@@ -51,7 +53,22 @@ def verify_path(path):
             print(FAIL + "Command denied. Type name of dir without slash signs!")
         else:
             return path
-
+        
+def line_split(line):
+    line = line + ' '
+    t = False
+    res = []
+    word = ''
+    for i in line:
+        if (i == '\"'):
+            t = not t
+            continue
+        if (i == ' ' and t) or (i != ' '):
+            word = word + i
+        elif i == ' ':
+            res.append(word)
+            word = ''
+    return res
 
 def cdirectory(path, curr_path=curr_path):
     curr_path = curr_path + path
@@ -91,17 +108,18 @@ def change_directory(path=''):
         return 1
     
     curr_path = os.path.normpath(path)
-    # print(f'current path = {curr_path}')
     return 0
     
-def send_message(ip=nip, command='init', arguments=[]):
+def send_message(ip=nip, command='init', arguments=[], file=None):
     to_send = json.loads(json_request)
     to_send['command'] = command
     to_send['arguments'] = arguments
-    # print(f'Sending: {to_send}')
 
     try:
-        response = requests.post(ip, json=to_send)
+        if file is not None:
+            response = requests.post(ip, json=to_send, files=file)
+        else:
+            response = requests.post(ip, json=to_send)
     except (requests.ReadTimeout):
         print(FAIL + "Connection timed out" + ENDC)
         return 1, ''
@@ -116,12 +134,16 @@ def get_abspath(path):
 def get_arguments(arguments):
     args = []
     for p in arguments:
+        if isinstance(p, int):
+            args.append(p)
+            continue
         if len(p) == 0:
             continue
         if p[0] == '/':
-            args.append(p)
+            path = p
         else:
-            args.append(get_abspath(p))
+            path = get_abspath(p)
+        args.append(os.path.normpath(path))
     return args    
 
 def connector():
@@ -145,7 +167,7 @@ def connector():
         # Getting commands while connection is active
         while validate['verdict'] == 0:
 
-            line = str(input(get_status_line())).split(' ')
+            line = line_split(str(input(get_status_line())))
 
             if line[0] not in commands:
                 if line[0] == 'exit()':
@@ -158,6 +180,30 @@ def connector():
                 cmd = msg_list[0]
 
                 arguments = msg_list[1:]
+
+                if cmd == 'local':
+                    if len(arguments) > 1:
+                        print(FAIL + 'Wrong number of arguments' + ENDC)
+                        continue
+                    
+                    path = '.'
+
+                    if len(arguments) != 0:
+                        path = arguments[0]
+                    
+                    if os.path.isdir(path):
+                        for file in os.listdir(path):
+                            if os.path.isfile(os.path.join(path, file)):
+                                print(OKGREEN + file + ENDC)
+                            else:
+                                print(OKBLUE + file + ENDC)
+                    elif os.path.isdir(path):
+                        print(FAIL + 'Is a file' + ENDC)
+                    else:
+                        print(FAIL + 'Invalid path' + ENDC)
+                    
+                    continue
+
 
                 if cmd == 'cd':
                     if len(arguments) > 0:
@@ -172,9 +218,53 @@ def connector():
                 if cmd == 'ls':
                     if len(arguments) == 0 :
                         arguments = [curr_path]
+                
+                if cmd == 'cpr':
+                    if len(arguments) < 1:
+                        print(FAIL + 'File is not specified' + ENDC)
+                        continue
 
-                arguments = get_arguments(arguments)
-                ver, response = send_message(command=commands[cmd], arguments=arguments)
+                    if len(arguments) > 2:
+                        print(FAIL + 'Invalid arguments' + ENDC)
+                        continue
+
+                    path = get_arguments([arguments[0]])
+
+                    if len(arguments) < 2:
+                        savepath = os.path.basename(path[0])
+                    elif os.path.isdir(arguments[1]):
+                        savepath = os.path.join(arguments[1], os.path.basename(path[0]))
+                    else:
+                        savepath = arguments[1]
+                    # savepath = arguments[1]
+
+                
+                if cmd == 'cpl':
+                    if len(arguments) < 1:
+                        print(FAIL + 'File is not specified' + ENDC)
+                        continue
+                    if not os.path.isfile(arguments[0]):
+                        print(FAIL + 'Invalid path' + ENDC)
+                        continue
+
+                    path = '.'
+                    if len(arguments) == 2:
+                        path = arguments[1]
+
+                    elif len(arguments) > 2:
+                        print(FAIL + 'Invalid arguments' + ENDC)
+                        continue
+                    path = get_arguments([path])[0]
+                    savepath = os.path.join(path, os.path.basename(arguments[0]))
+                    size = os.path.getsize(arguments[0])
+                    sarguments = get_arguments([savepath, size])
+                    ver, response = send_message(command=commands[cmd], arguments=sarguments)
+                    # filepath = arguments[0]
+                    # files = {'file': open(filepath,'rb')}
+
+                else:
+                    arguments = get_arguments(arguments)
+                    ver, response = send_message(command=commands[cmd], arguments=arguments)
 
                 if ver == 1:
                     continue
@@ -182,8 +272,6 @@ def connector():
                     return
                 
                 response = response.json()
-                # print(response['verdict'])
-                # print(response)
 
                 if response['verdict'] == 1:
                     print(FAIL + response['message'] + ENDC)
@@ -199,25 +287,44 @@ def connector():
 
                     elif cmd == 'touch':
                         print("File has been created")
+
                     elif cmd == 'rm':
                         print("File has been deleted")
-                    else:
-                        #  cmd == 'info':
-                        print(response['message'])
-                    # if cmd == 'cp':
-                    #     print(response['message'])
-                    # if cmd == 'mv':
-                    #     print(response['message'])
-                    # if cmd == 'r--':
-                    #     print(response['message'])
-                    # if cmd == 'rw-':
-                    #     print(response['message'])
-                    # if cmd == 'rm-r':
-                    #     print(response['message'])
-                    # if cmd == 'mkdir':
-                    #     print(response['message'])
 
-                    # print('>> ' + response['message'])
+                    elif cmd == 'cpr':
+                        datanode = response['message']
+                        ver, response = send_message(ip=datanode, command=commands[cmd], arguments=path)
+                        if ver != 0:
+                            print(FAIL + 'Datanode Connection error' + ENDC)
+                            continue
+                        response = response.json()
+                        file_content = response['message']
+                        with open(savepath, 'w') as f:
+                            f.write(file_content)
+
+                    elif cmd == 'cpl':
+                        filepath = arguments[0]
+                        datanode = response['message']
+
+                        with open(filepath, 'r') as f:
+                            file_content = f.read()
+
+                        ver, response = send_message(ip=datanode, command=commands[cmd], arguments=[savepath, file_content])
+                        if ver != 0:
+                            print(FAIL + 'Connection error' + ENDC)
+                            continue
+
+                        response = response.json()
+                        print(response['message'])
+                    
+                    elif cmd == 'info':
+                        finfo = json.loads(response['message'])
+                        print(OKBLUE + f'name: {finfo["name"]}' + ENDC)
+                        print(OKBLUE + f'size: {finfo["size"]}' + ENDC)
+                        
+                    else:
+                        print(response['message'])
+
 
             if line[0] == 'exit()':
                 print(OKGREEN + "Connection has been closed")
@@ -228,6 +335,8 @@ def connector():
 
 
 if __name__ == '__main__':
+    if len(sys.argv) < 3:
+        print('Remote server address not specified')
+        exit(1)
+    nip = f'http://{sys.argv[0]}:{sys.argv[1]}'
     connector()
-    # fn = Process(target=connector)
-    # fn.start()
