@@ -7,6 +7,7 @@ from pprint import pprint
 from datanode.handlers import *
 import os
 import requests
+import psutil
 
 
 PING_RESPONSE = {"id": 1}
@@ -32,7 +33,8 @@ class DataNodePropagate(Thread):
 
 
 def request_datanodes_info():
-    res = requests.get(NAMENODE, json={'command': 'dn_list'})
+    free_mem_size = psutil.disk_usage(app.config['root']).free
+    res = requests.get(NAMENODE, json={'command': 'dn_list', 'size': free_mem_size})
     add_nodes(res.json())
 
 
@@ -137,5 +139,5 @@ if __name__ == "__main__":
     else:
         raise ValueError('The arguments provided are incorrect.')
     app.config['root'] = root
-    # request_datanodes_info()
+    request_datanodes_info()
     app.run(debug=True, host='0.0.0.0')
