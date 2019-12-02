@@ -1,9 +1,7 @@
 from flask import Flask
 from flask import request
 from threading import Thread
-import json
 import sys
-from pprint import pprint
 from handlers import *
 import os
 import requests
@@ -18,12 +16,14 @@ app = Flask(__name__)
 
 
 class DataNodePropagate(Thread):
+    # a new thread to propagate updates to other nodes
     def __init__(self, url, data):
         Thread.__init__(self)
         self.url = url
         self.data = data
 
     def run(self):
+        # make three tries
         tries = 0
         while tries < 3:
             resp = requests.get(self.url, json=self.data)
@@ -33,6 +33,7 @@ class DataNodePropagate(Thread):
 
 
 def request_datanodes_info():
+    # request information about datanodes
     free_mem_size = psutil.disk_usage(app.config['root']).free
     res = requests.get(NAMENODE, json={'command': 'dn_list', 'size': free_mem_size})
     print("PRINTTTT", res)
@@ -41,8 +42,9 @@ def request_datanodes_info():
 
 
 def propagate(request):
+    # propagate updates to other nodes
     for node in DATANODE_ADDRESSES:
-        print(node)
+        print('PROPAGATING TO NODE: ', node)
         url = os.path.join(node, '/')
         print(url)
         data = request.get_json()
@@ -52,6 +54,7 @@ def propagate(request):
 
 
 def add_nodes(json_data):
+    # add a new datanode to the list
     if 'arguments' not in json_data:
         for addr in json_data['arguments']:
             DATANODE_ADDRESSES.add(addr)
@@ -61,6 +64,7 @@ def add_nodes(json_data):
 
 
 def remove_nodes(json_data):
+    # remove a datanode from the list
     if 'arguments' not in json_data:
         for addr in json_data['arguments']:
             DATANODE_ADDRESSES.remove(addr)
@@ -71,6 +75,7 @@ def remove_nodes(json_data):
 
 @app.route('/', methods=['GET', 'POST'])
 def handle_request():
+    # handle comming requests
     json_data = request.get_json(force=True)
     print(json_data, flush=True)
     try:
