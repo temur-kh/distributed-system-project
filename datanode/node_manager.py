@@ -4,7 +4,7 @@ from threading import Thread
 import json
 import sys
 from pprint import pprint
-from datanode.handlers import *
+from handlers import *
 import os
 import requests
 import psutil
@@ -35,6 +35,8 @@ class DataNodePropagate(Thread):
 def request_datanodes_info():
     free_mem_size = psutil.disk_usage(app.config['root']).free
     res = requests.get(NAMENODE, json={'command': 'dn_list', 'size': free_mem_size})
+    print("PRINTTTT", res)
+    print(res.json())
     add_nodes(res.json())
 
 
@@ -67,33 +69,20 @@ def remove_nodes(json_data):
         return {'verdict': 1, 'message': 'No arguments are provided.'}
 
 
-@app.route('/', methods=['POST'])
-def post_request():
-    json_data = request.get_json()
-    pprint(json_data)
+@app.route('/', methods=['GET', 'POST'])
+def handle_request():
+    json_data = request.get_json(force=True)
+    print(json_data, flush=True)
     try:
         cmd = json_data['command']
     except KeyError:
-        return json.dumps({'verdict': 1, 'message': 'The request does not contain command field.'})
-
-    if cmd == 'write_file':
-        result = write_file(app, request)
-        propagate(request)
-    else:
-        result = {'verdict': 1, 'message': 'The command is invalid.'}
-
-    return json.dumps(result)
-
-@app.route('/', methods=['GET'])
-def get_request():
-    json_data = request.get_json()
-    try:
-        cmd = json_data['command']
-    except KeyError:
-        return json.dumps({'verdict': 1, 'message': 'The request does not contain command field.'})
+        return {'verdict': 1, 'message': 'The request does not contain command field.'}
 
     if cmd == 'init':
         result = init(app, request)
+        propagate(request)
+    elif cmd == 'write_file':
+        result = write_file(app, request)
         propagate(request)
     elif cmd == 'create_file':
         result = create_file(app, request)
@@ -138,6 +127,7 @@ if __name__ == "__main__":
         root = sys.argv[2]
     else:
         raise ValueError('The arguments provided are incorrect.')
+    print(root)
     app.config['root'] = root
     request_datanodes_info()
-    app.run(debug=True, host='0.0.0.0', port=80)
+    app.run(debug=True, host='0.0.0.0')
