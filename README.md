@@ -6,8 +6,10 @@ Academic Project Fall 2019 (Distributive Systems Course)
 
 ### Contribution to the project
 
-**Temur Kholmatov** - data node implementation, full system testing.
-**Abdulkhamid Muminov** - implemented the logic of client, aid in system testing.
+**Temur Kholmatov** - data node implementation, docker-swarm configuration.
+
+**Abdulkhamid Muminov** - client implementation, system testing.
+
 **Rakhimov Abdurasul** - name node implementation, maintained communication between datanodes, client and name node.
 
 ### Prerequisites 
