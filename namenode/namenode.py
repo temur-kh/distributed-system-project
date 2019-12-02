@@ -40,6 +40,17 @@ def process():
     print(omessage['command'])
     # message_json = json.loads(message)
 
+    if omessage['command'] == 'dn_list':
+        size = omessage['size']
+        response = json.loads('{}')
+        response['command'] = 'NEW_NODE'
+        response['arguments'] = state.get_available_datanodes()
+        state.setNewSize(size)
+        datanode_ip = request.environ['REMOTE_ADDR']
+        datanode_port = request.environ['REMOTE_PORT']
+        state.addNewDatanode(ip=datanode_ip, port=datanode_port)
+        return response
+
     code, message = state.tree.perform(omessage)
     print(f'code = {code}, message = {message}')
     if code < 2:
@@ -75,7 +86,7 @@ if __name__ == "__main__":
     msgs = Message()
     state = State()
 
-    pinger = HealthChecker(state.get_datanodes(), msgs)
+    pinger = HealthChecker(state, msgs)
     pinger.start()
 
     app.run()
