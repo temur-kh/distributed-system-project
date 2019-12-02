@@ -32,3 +32,6 @@ https://github.com/temur-kh/distributed-system-project/tree/master
 
 https://hub.docker.com/repository/docker/temur/datanode
 https://hub.docker.com/repository/docker/temur/namenode
+
+
+### [Here you can overview project architecture](https://docs.google.com/presentation/d/16LXnTU3eRW8o7k3GgPYiyuKM5N5BmlVwBp0HSEidIPE/edit?usp=sharing)
