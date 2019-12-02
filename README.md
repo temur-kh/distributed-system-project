@@ -71,6 +71,27 @@ Install requirements
 ### Replication
 ![](/res/repl.png)
 
+### Description of communication protocols
+
+All requests send JSON files of following consistency:
+
+```json
+sample_request = {
+    "command": "sample command",
+    "arguments": []
+}
+
+sample_response = {
+    "verdict": 1 || 0,
+    "message": "sample message"
+}
+
+sample_datanode_request = {
+    "command": "sample command",
+    "arguments": [],
+    "ip": "XXX.XXX.XXX.XXX"
+}
+```
 
 ### Github:
 
