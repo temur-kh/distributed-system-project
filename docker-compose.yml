@@ -27,6 +27,8 @@ services:
       mode: global
       placement:
         constraints: [node.role == worker]
+      restart_policy:
+        condition: on-failure
     networks:
       - dfs
     depends_on:
