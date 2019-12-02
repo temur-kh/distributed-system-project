@@ -1,11 +1,13 @@
 from flask import Flask
 from flask import request
-import requests
 from threading import Thread
 import json
 import sys
 from pprint import pprint
 from datanode.handlers import *
+import os
+import requests
+
 
 PING_RESPONSE = {"id": 1}
 DATANODE_ADDRESSES = set()
@@ -23,21 +25,22 @@ class DataNodePropagate(Thread):
     def run(self):
         tries = 0
         while tries < 3:
-            resp = requests.get(self.url, params=self.data)
+            resp = requests.get(self.url, json=self.data)
             if resp.json()['verdict'] == 0:
                 break
             tries += 1
 
 
 def request_datanodes_info():
-    res = requests.get(NAMENODE, params={'command': 'dn_list'})
+    res = requests.get(NAMENODE, json={'command': 'dn_list'})
     add_nodes(res.json())
 
 
 def propagate(request):
-    datanodes = request['arguments']
-    for node in datanodes:
+    for node in DATANODE_ADDRESSES:
+        print(node)
         url = os.path.join(node, '/')
+        print(url)
         data = request.get_json()
         data['arguments'] = []
         conn = DataNodePropagate(url, data)
@@ -73,7 +76,7 @@ def post_request():
 
     if cmd == 'write_file':
         result = write_file(app, request)
-        pass
+        propagate(request)
     else:
         result = {'verdict': 1, 'message': 'The command is invalid.'}
 
@@ -82,7 +85,6 @@ def post_request():
 @app.route('/', methods=['GET'])
 def get_request():
     json_data = request.get_json()
-    pprint(json_data)
     try:
         cmd = json_data['command']
     except KeyError:
@@ -90,38 +92,37 @@ def get_request():
 
     if cmd == 'init':
         result = init(app, request)
-        pass
+        propagate(request)
     elif cmd == 'create_file':
         result = create_file(app, request)
-        pass
+        propagate(request)
     elif cmd == 'delete_file':
         result = delete_file_or_dir(app, request)
-        pass
+        propagate(request)
     elif cmd == 'copy_file':
         result = copy_file(app, request)
-        pass
+        propagate(request)
     elif cmd == 'move_file':
         result = move_file(app, request)
-        pass
+        propagate(request)
     elif cmd == 'read_file':
         result = read_file(app, request)
     elif cmd == 'delete_dir':
         result = delete_file_or_dir(app, request)
-        pass
+        propagate(request)
     elif cmd == 'read_dir':
         result = read_dir(app, request)
     elif cmd == 'make_dir':
         result = make_dir(app, request)
-        pass
+        propagate(request)
     elif cmd == 'PING':
         result = PING_RESPONSE
-        pass
     elif cmd == 'NEW_NODE':
         result = add_nodes(request.get_json())
-        pass
     elif cmd == "DELETE_NODE":
         result = remove_nodes(request.get_json())
-        pass
+    elif cmd == "repl":
+        result = replicate(app, request)
     else:
         result = {'verdict': 1, 'message': 'The command is invalid.'}
         pass
@@ -136,5 +137,5 @@ if __name__ == "__main__":
     else:
         raise ValueError('The arguments provided are incorrect.')
     app.config['root'] = root
-    request_datanodes_info()
-    app.run(debug=True)
+    # request_datanodes_info()
+    app.run(debug=True, host='0.0.0.0')

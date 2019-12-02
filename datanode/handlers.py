@@ -1,5 +1,6 @@
 import os
 import shutil
+import requests
 
 
 def write_file(app, request):
@@ -14,7 +15,7 @@ def write_file(app, request):
         return {'verdict': 1, 'message': 'No arguments for the command.'}
     elif len(json_data['arguments']) != 1:
         return {'verdict': 1, 'message': 'Wrong number of arguments is passed.'}
-    file_path = json_data['arguments'][0]
+    file_path = json_data['arguments'][0][1:]
 
     try:
         path = os.path.join(app.config['root'], file_path)
@@ -39,14 +40,13 @@ def create_file(app, request):
         return {'verdict': 1, 'message': 'No arguments for the command.'}
     elif len(json_data['arguments']) != 1:
         return {'verdict': 1, 'message': 'Wrong number of arguments is passed.'}
-    file_path = json_data['arguments'][0]
-
+    file_path = json_data['arguments'][0][1:]
+    path = os.path.join(app.config['root'], file_path)
     try:
-        path = os.path.join(app.config['root'], file_path)
-        open(path).close()
+        open(path, 'wb').close()
         return {'verdict': 0, 'message': 'File was created.'}
     except:
-        return {'verdict': 1, 'message': 'Wrong path for file creation is given.'}
+        return {'verdict': 1, 'message': f'Wrong path for file creation is given: {path}.'}
 
 
 def delete_file_or_dir(app, request):
@@ -55,7 +55,7 @@ def delete_file_or_dir(app, request):
         return {'verdict': 1, 'message': 'No arguments for the command.'}
     elif len(json_data['arguments']) != 1:
         return {'verdict': 1, 'message': 'Wrong number of arguments is passed.'}
-    file_path = json_data['arguments'][0]
+    file_path = json_data['arguments'][0][1:]
 
     try:
         path = os.path.join(app.config['root'], file_path)
@@ -66,7 +66,7 @@ def delete_file_or_dir(app, request):
             os.removedirs(path)
         else:
             raise Exception
-        return {'verdict': 0, 'message': 'File was created.'}
+        return {'verdict': 0, 'message': 'File/directory was deleted.'}
     except:
         return {'verdict': 1, 'message': 'Wrong path for file or directory deletion is given.'}
 
@@ -77,14 +77,14 @@ def copy_file(app, request):
         return {'verdict': 1, 'message': 'No arguments for the command.'}
     elif len(json_data['arguments']) != 2:
         return {'verdict': 1, 'message': 'Wrong number of arguments is passed.'}
-    from_path = json_data['arguments'][0]
-    to_path = json_data['arguments'][1]
+    from_path = json_data['arguments'][0][1:]
+    to_path = json_data['arguments'][1][1:]
 
     try:
         from_path = os.path.join(app.config['root'], from_path)
         to_path = os.path.join(app.config['root'], to_path)
         shutil.copy2(from_path, to_path)
-        return {'verdict': 0, 'message': 'File was created.'}
+        return {'verdict': 0, 'message': 'File was copied.'}
     except:
         return {'verdict': 1, 'message': 'Wrong paths for file copy are given.'}
 
@@ -95,14 +95,14 @@ def move_file(app, request):
         return {'verdict': 1, 'message': 'No arguments for the command.'}
     elif len(json_data['arguments']) != 2:
         return {'verdict': 1, 'message': 'Wrong number of arguments is passed.'}
-    from_path = json_data['arguments'][0]
-    to_path = json_data['arguments'][1]
+    from_path = json_data['arguments'][0][1:]
+    to_path = json_data['arguments'][1][1:]
 
     try:
         from_path = os.path.join(app.config['root'], from_path)
         to_path = os.path.join(app.config['root'], to_path)
         shutil.move(from_path, to_path)
-        return {'verdict': 0, 'message': 'File was created.'}
+        return {'verdict': 0, 'message': 'File was moved.'}
     except:
         return {'verdict': 1, 'message': 'Wrong paths for file move are given.'}
 
@@ -113,12 +113,13 @@ def read_file(app, request):
         return {'verdict': 1, 'message': 'No arguments for the command.'}
     elif len(json_data['arguments']) != 1:
         return {'verdict': 1, 'message': 'Wrong number of arguments is passed.'}
-    file_path = json_data['arguments'][0]
+    file_path = json_data['arguments'][0][1:]
 
     try:
         path = os.path.join(app.config['root'], file_path)
+        print(path)
         if os.path.isfile(path):
-            with open(file_path) as file:
+            with open(path, 'r') as file:
                 msg = file.read()
             return {'verdict': 0, 'message': msg}
         else:
@@ -133,7 +134,7 @@ def read_dir(app, request):
         return {'verdict': 1, 'message': 'No arguments for the command.'}
     elif len(json_data['arguments']) != 1:
         return {'verdict': 1, 'message': 'Wrong number of arguments is passed.'}
-    file_path = json_data['arguments'][0]
+    file_path = json_data['arguments'][0][1:]
 
     try:
         path = os.path.join(app.config['root'], file_path)
@@ -145,13 +146,14 @@ def read_dir(app, request):
     except:
         return {'verdict': 1, 'message': 'Wrong path for directory read is given.'}
 
+
 def make_dir(app, request):
     json_data = request.get_json()
     if 'arguments' not in json_data:
         return {'verdict': 1, 'message': 'No arguments for the command.'}
     elif len(json_data['arguments']) != 1:
         return {'verdict': 1, 'message': 'Wrong number of arguments is passed.'}
-    file_path = json_data['arguments'][0]
+    file_path = json_data['arguments'][0][1:]
 
     try:
         path = os.path.join(app.config['root'], file_path)
@@ -162,3 +164,27 @@ def make_dir(app, request):
             raise Exception
     except:
         return {'verdict': 1, 'message': 'Wrong path for directory read is given.'}
+
+
+def recursive_repl(dir, url):
+    requests.get(url, json={'command': 'make_dir', 'arguments': [dir]})
+    for name in os.listdir(dir):
+        path = os.path.join(dir, name)
+        if os.path.isfile(path):
+            requests.post(url,
+                          json={'command': 'write_file', 'arguments': [path]},
+                          files={path: open(path, 'rb')})
+        else:
+            recursive_repl(path, url)
+
+
+def replicate(app, request):
+    json_data = request.get_json()
+    if 'arguments' not in json_data:
+        return {'verdict': 1, 'message': 'No arguments for the command.'}
+    elif len(json_data['arguments']) != 1:
+        return {'verdict': 1, 'message': 'Wrong number of arguments is passed.'}
+    url = json_data['arguments'][0]
+    root = app.config['root']
+    recursive_repl(dir, url)
+    return {'verdict': 0, 'message': 'Replication completed.'}
