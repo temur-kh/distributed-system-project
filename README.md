@@ -62,6 +62,14 @@ Install requirements
   ```
 
   
+### Application architecture
+![](/res/arch.png)
+
+### Write/Read/Dele flow
+![](/res/wrd.png)
+
+### Replication
+![](/res/repl.png)
 
 
 ### Github:
