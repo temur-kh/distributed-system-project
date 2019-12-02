@@ -62,8 +62,8 @@ class Message:
     def cread_file(self, path):
         return self.get_message(command='read_file', arguments=[path])
     
-    def cwrite_file(self, path):
-        return self.get_message(command='write_file', arguments=[path])
+    def cwrite_file(self, path, size=0):
+        return self.get_message(command='write_file', arguments=[path, size])
     
     def cdelete_dir(self, path):
         return self.get_message(command='delete_dir', arguments=[path])

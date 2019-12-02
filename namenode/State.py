@@ -11,11 +11,11 @@ class Namenode:
 
 
 class Datanode:
-    def __init__(self, name, ip_address, port_number):
+    def __init__(self, name, ip_address, port_number, status=-1):
         self.name = name
         self.port = port_number
         self.ip = ip_address
-        self.status = False
+        self.status = status
         self.cid = None
 
     def getName(self):
@@ -50,8 +50,8 @@ class Datanodes:
     def __init__(self):
         self.datanodes = []
 
-    def addNewNode(self, name, ip_address, port_number):
-        self.datanodes.append(Datanode(name, ip_address, port_number))
+    def addNewNode(self, name, ip_address, port_number, status=-1):
+        self.datanodes.append(Datanode(name, ip_address, port_number, status))
     
     def getDatanodes(self):
         return self.datanodes
@@ -63,7 +63,7 @@ class Datanodes:
     def getActiveDatanodes(self):
         res = []
         for dnode in self.datanodes:
-            if dnode.getStatus():
+            if dnode.getStatus() == 1:
                 res.append(dnode)
         return res
     
@@ -113,33 +113,46 @@ class State:
         self.datanodes = Datanodes()
         dnodes = self.configuration['datanodes']
         for dnode in dnodes:
-            self.datanodes.addNewNode(dnode['name'], dnode['ip'], dnode['port'])
+            self.datanodes.addNewNode(dnode['name'], dnode['ip'], dnode['port'], status=1)
     
     def get_datanodes(self):
         return self.datanodes.getDatanodes()
     
-    # def initialize_communications(self):
-    #     for dnode in self.datanodes.getDatanodes():
-    #         dnode.setSocket(self.context.socket(zmq.DEALER)) #pylint: disable=no-member
-    
+    def get_available_datanodes(self):
+        nodes = []
+        for dnode in self.get_datanodes():
+            if dnode.getStatus() == 1:
+                nodes.append(dnode.getAddress())
+        return nodes
+
     def get_available_node(self):
         for dnode in self.get_datanodes():
-            if(dnode.getStatus()):
+            if(dnode.getStatus() == 1):
                 return dnode
         return None
+    
+    def setNewSize(self, newSize):
+        self.size = min(self.size, newSize)
+    
+    def addNewDatanode(self, name=None, ip='127.0.0.1', port=2000):
+        if name is None:
+            name = 'datanode' + str(len(self.get_datanodes()))
+        
+        self.datanodes.addNewNode(name=name, ip_address=ip, port_number=port)
 
 class Dir:
     def  __init__(self):
         self.subdir = []
     
-    def setValues(self, name, isFile=0, subdir=[]):
+    def setValues(self, name, isFile=0, size=0, subdir=[]):
         self.name = name
         self.isFile = isFile
+        self.size = size
         for subd in subdir:
             self.subdir.append(subd)
 
     def __str__(self):
-        return f'Name: {self.name}, isFile: {self.isFile}, subdir len: {len(self.subdir)}'
+        return f'Name: {self.name}, isFile: {self.isFile}, size: {self.size} subdir len: {len(self.subdir)}'
 
     def getName(self):
         return self.name
@@ -149,6 +162,12 @@ class Dir:
     
     def getType(self):
         return self.isFile
+
+    def setSize(self, size=0):
+        self.size = size
+    
+    def getSize(self):
+        return self.size
 
     def addSubDir(self, dirs):
         self.subdir.append(copy.copy(dirs))
@@ -190,11 +209,10 @@ class Dir:
 class Tree:
     def __init__(self, configuration_path='directory_tree.json'):
         self.root = None
-        self.configuration_path = configuration_path
-        self.load_conf()
-        self.conf = None
-        self.load_conf()
-        self.root = self.parse_conf(self.conf)
+        # self.configuration_path = configuration_path
+        # self.conf = None
+        # self.load_conf()
+        # self.root = self.parse_conf(self.conf)
         # self.iterate(self.root)
         # print(self.is_valid_path('/etc/../etc/../'))
 
@@ -427,6 +445,7 @@ class Tree:
         
         info = {}
         info['name'] = file.getName()
+        info['size'] = file.getSize()
         message = json.dumps(info)
         return 0, message
     
@@ -463,7 +482,7 @@ class Tree:
         info_string = json.dumps(info)
         return 0, info_string
     
-    def write_file(self, path):
+    def write_file(self, path, size=0):
         if path is None:
             return 1, 'Path is not specified'
 
@@ -488,7 +507,9 @@ class Tree:
         return 3, 'Success'
     
     def init(self):
-        return 0, 'Success'
+        self.root = Dir()
+        self.root.setValues(name='root')
+        return 2, 'Success'
     
     def perform(self, message):
         command = message['command']
@@ -512,7 +533,7 @@ class Tree:
         if command == 'init':
             return self.init()
         if command == 'write_file':
-            return self.write_file(args[0])
+            return self.write_file(path=args[0], size=args[1])
         if command == 'read_file':
             return self.read_file(args[0])
         
