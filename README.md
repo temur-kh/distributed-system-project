@@ -82,7 +82,7 @@ sample_request = {
 }
 
 sample_response = {
-    "verdict": 1 || 0,
+    "verdict": 1 or 0,
     "message": "sample message"
 }
 
