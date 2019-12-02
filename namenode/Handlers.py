@@ -1,6 +1,5 @@
 import threading
 import os
-import zmq
 import time
 import sys
 import json
@@ -75,6 +74,6 @@ class HealthChecker(threading.Thread):
                     except(requests.ReadTimeout, requests.ConnectionError):
                         continue
 
-            time.sleep(10)
+            time.sleep(3)
 
             

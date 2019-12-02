@@ -133,4 +133,4 @@ if __name__ == "__main__":
         raise ValueError('The arguments provided are incorrect.')
     app.config['root'] = root
     request_datanodes_info()
-    app.run(debug=True, port=8000)
+    app.run(debug=True, host='0.0.0.0', port=8000)

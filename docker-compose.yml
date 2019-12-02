@@ -1,0 +1,41 @@
+version: '3'
+
+services:
+  namenode:
+    image: temur/namenode
+    build:
+      context: .
+      dockerfile: namenode/Dockerfile
+    ports:
+      - "5000:5000"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - dfs
+
+  datanode:
+    image: temur/datanode
+    build:
+      context: .
+      dockerfile: datanode/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - datapool:/tmp/
+    deploy:
+      mode: global
+      placement:
+        constraints: [node.role == worker]
+      restart_policy:
+        condition: on-failure
+    networks:
+      - dfs
+    depends_on:
+      - namenode
+
+networks:
+  dfs:
+
+volumes:
+  datapool:
