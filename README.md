@@ -50,7 +50,7 @@ Install requirements
   	"touch" <path>: creates file,
           "rm"	<path>: deletes file,
           "info"	<path>: provides information about the file,
-          "cp"	<path>: copies the file,
+          "cp"	<path1> <path2>: copies the file,
           "mv"	<path1> <path2>: moves the file,
           "cpr"	<path>: reads the file,
           "cpl"	<path>: writes the file,
