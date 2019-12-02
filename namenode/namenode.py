@@ -48,11 +48,7 @@ def process():
         response['arguments'] = state.get_available_datanodes()
         state.setNewSize(size)
         datanode_ip = request.environ['REMOTE_ADDR']
-        num += 1
-        if num > 2:
-            datanode_port = 8001
-        else:
-            datanode_port = DATANODE_PORT
+        datanode_port = DATANODE_PORT
 
         print(f'new datanode. ip: {datanode_ip}, port: {datanode_port}')
         state.addNewDatanode(ip=datanode_ip, port=datanode_port)
@@ -96,4 +92,4 @@ if __name__ == "__main__":
     pinger = HealthChecker(state, msgs)
     pinger.start()
 
-    app.run()
+    app.run(debug=True, host='namenode', port=5000)

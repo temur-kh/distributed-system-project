@@ -20,7 +20,7 @@ services:
       context: .
       dockerfile: datanode/Dockerfile
     ports:
-      - "8000:5000"
+      - "8000:8000"
     volumes:
       - datapool:/tmp/
     deploy:
