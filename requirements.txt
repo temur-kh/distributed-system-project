@@ -6,7 +6,7 @@ certifi==2019.11.28
 chardet==3.0.4
 idna==2.8
 itsdangerous==1.1.0
-pip==19.3.1
+pip==21.1
 psutil==5.6.7
 requests==2.22.0
 setuptools==42.0.2
